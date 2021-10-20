@@ -1,4 +1,4 @@
-// Creates a Cumulative Sum measure for every currently selected measure.
+// Creates a Cumulative Sum measure for every currently selected measure or Column.
 foreach(var m in Selected.Measures)
 {
     var newMeasure = m.Table.AddMeasure(
