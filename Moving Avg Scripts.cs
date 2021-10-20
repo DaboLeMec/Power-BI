@@ -1,4 +1,4 @@
-// Creates a SUM measure for every currently selected column and hide the column.
+// Creates a Moving Average measure for every currently selected column and hide the column.
 foreach(var m in Selected.Measures)
 {
     var newMeasure = m.Table.AddMeasure(
