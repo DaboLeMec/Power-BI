@@ -1,0 +1,10 @@
+// Creates a measure for the most recent value for every currently selected measure
+foreach(var c in Selected.Measures)
+{    var newMeasure = c.Table.AddMeasure(
+    c.Name + " Current",    // Currently Selected Measure Name Appended with Current
+    "VAR M = MAX ( 'Dim Date'[RelativeWeekNum] )VAR Cal = CALCULATE (" + c.DaxObjectFullName + " ,FILTER (ALLSELECTED ( 'Dim Date' ), 'Dim Date'[RelativeWeekNum] = M)) RETURN CAL " // DAX Expression
+    );
+    // Set the format string on the new measure:
+    newMeasure.FormatString = "#,0";
+}
+
