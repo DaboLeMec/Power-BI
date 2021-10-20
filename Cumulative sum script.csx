@@ -6,4 +6,6 @@ foreach(var m in Selected.Measures)
     " VAR MAXDATE = MAX( 'Date'[Date] ) RETURN CALCULATE( " +  m.DaxObjectFullName + " , FILTER( ALL( 'Date') , 'Date'[Date] < MAXDATE ) )"
     m.DisplayFolder =   "_Cumulative Sums"                   // Display Folder
     );
+    // Set the format string on the new measure:
+    newMeasure.FormatString = "#,0";
 }
