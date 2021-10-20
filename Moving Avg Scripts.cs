@@ -6,4 +6,6 @@ foreach(var m in Selected.Measures)
     "VAR Week = 4 RETURN DIVIDE( SUMX( FILTER(  ALL( '_Date' ), _Date[RelativeFiscalWeekNumber] > MAX( _Date[RelativeFiscalWeekNumber] ) - Week &&_Date[RelativeFiscalWeekNumber] <= MAX( _Date[RelativeFiscalWeekNumber] )  )," + m.DaxObjectFullName + ") , Week )",
      m.DisplayFolder =   "_Moving Avgs"                   // Display Folder
     );
+    // Set the format string on the new measure:
+    newMeasure.FormatString = "#,0";
 }
