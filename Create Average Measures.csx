@@ -3,8 +3,8 @@ foreach(var c in Selected.Columns)
 {
     var newMeasure = c.Table.AddMeasure(
     "AVG " + c.Name,                    // Name
-        "AVERAGE(" + c.DaxObjectFullName + ")",    // DAX expression
-        c.DisplayFolder  = "_Calcs"            // Display Folder
+        "AVERAGE(" + c.DaxObjectFullName + ")"    // DAX expression
+        
     );
     
     // Set the format string on the new measure:
