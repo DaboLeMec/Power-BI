@@ -12,7 +12,4 @@ foreach(var c in Selected.Columns)
 
     // Provide some documentation:
     newMeasure.Description = "This measure is the sum of column " + c.DaxObjectFullName;
-
-    // Hide the base column:
-    c.IsHidden = true;
 }
