@@ -13,6 +13,4 @@ foreach(var c in Selected.Columns)
     // Provide some documentation:
     newMeasure.Description = "This measure is the Average of column " + c.DaxObjectFullName;
 
-    // Hide the base column:
-    c.IsHidden = true;
 }
