@@ -1,4 +1,4 @@
-//Loop through all values in a column and create a calculate measure for each one
+//Loop through all values in a column and create a calculated measure for each distinct row value
 //Replace text with column name of values to loop through
 string query = "EVALUATE VALUES('DesiredTable'[DesiredColumn])";
  
