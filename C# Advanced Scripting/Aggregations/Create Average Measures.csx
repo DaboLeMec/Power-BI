@@ -10,7 +10,5 @@ foreach(var c in Selected.Columns)
     // Set the format string on the new measure:
     newMeasure.FormatString = "#,0";
 
-    // Provide some documentation:
-    newMeasure.Description = "This measure is the Average of column " + c.DaxObjectFullName;
 
 }

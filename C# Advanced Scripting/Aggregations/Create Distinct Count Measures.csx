@@ -10,6 +10,4 @@ foreach(var c in Selected.Columns)
     // Set the format string on the new measure:
     newMeasure.FormatString = "#,0";
 
-    // Provide some documentation:
-    newMeasure.Description = "This measure is the sum of column " + c.DaxObjectFullName;
 }
