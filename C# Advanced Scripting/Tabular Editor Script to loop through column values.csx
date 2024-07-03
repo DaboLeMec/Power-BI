@@ -1,5 +1,6 @@
 //Loop through all values in a column and create a calculated measure for each distinct row value
 //Replace text with column name of values to loop through
+//Confirm you don't have a ton of values in the column as this will create a measure for each value!!!
 string query = "EVALUATE VALUES('DesiredTable'[DesiredColumn])";
  
 using (var reader = Model.Database.ExecuteReader(query))
