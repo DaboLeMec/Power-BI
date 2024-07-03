@@ -1,4 +1,5 @@
 // Creates a measure for the most recent value based on relative week Column for every currently selected measure
+// Make sure you have the correct datedim column and table names
 foreach(var c in Selected.Measures)
 {    var newMeasure = c.Table.AddMeasure(
     c.Name + " Current",    // Currently Selected Measure Name Appended with Current
