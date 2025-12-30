@@ -1,61 +1,77 @@
-// Creates a series of measures for KPIs
+//For Whole Number / $ Measures
+//Creates a folder for all the newly created measures and a subfolder for the conditional formatting measures
+//Creates a measure for the most recent Month for every currently selected measure
+//Creates a measure for the previous Month for the selected measure
+//Creates a change measure between the most recent month and the previous month
+//creates a measure for a target to compare to the most recent month
+//creates conditional formatting for current vs target
+
+//Loop through for each selected measure
 foreach (var c in Selected.Measures)
 {
+
+var df = "__KPIs\\" + c.Name + "\\MoM";
+
+// Prior month for the selected measure
     var PenultimateMeasure = c.Table.AddMeasure(
-    c.Name + " Penultimate",    // Currently Selected Measure Name Appended with Penultimate
-    "VAR M = MAX ( 'Date'[Month] )"
+//Measure is called the selected measure name and "Penultimate"
+    c.Name + " Penultimate",    
+    "VAR M = MAX ( 'Date'[FirstDateofMonth] )"
     + "VAR Cal = CALCULATE (" + c.DaxObjectFullName
-    + " ,FILTER (ALLSELECTED ( 'Date' ), 'Date'[Month] = M - 1 )) "
+    + " ,FILTER (ALLSELECTED ( 'Date' ), 'Date'[FirstDateofMonth] = M - 1 )) "
     + "RETURN "
     + "Cal "
     );
-    // Set the format string on the new measure:
-    PenultimateMeasure.FormatString = "#,0";
-    PenultimateMeasure.DisplayFolder = "__KPIs\\" + c.Name;
+// Set the format string on the new measure, percentage with one decimal place
+    PenultimateMeasure.FormatString = "0;-0,0";
+//Set the display folder for the measure to be KPIS and subfolder of the measure name
+    PenultimateMeasure.DisplayFolder = df;
 
 
-    //Current Value for the measure
+//Most recent month for the measure
     var CurrentMeasure = c.Table.AddMeasure(
     c.Name + " Current",    // Currently Selected Measure Name Appended with Current
-    "VAR M = MAX ( 'Date'[Month] )"
+    "VAR M = MAX ( 'Date'[FirstDateofMonth] )"
     + "VAR Cal = CALCULATE (" + c.DaxObjectFullName
-    + " ,FILTER (ALLSELECTED ( 'Date' ), 'Date'[Month] = M )) "
+    + " ,FILTER (ALLSELECTED ( 'Date' ), 'Date'[FirstDateofMonth] = M )) "
     + "RETURN "
     + "Cal "
     );
-    // Set the format string on the new measure:
-    CurrentMeasure.FormatString = "#,0";
-    CurrentMeasure.DisplayFolder = "__KPIs\\" + c.Name;
+// Set the format string on the new measure, percentage with one decimal place
+    CurrentMeasure.FormatString = "0;-0,0";
+//Set the display folder for the measure to be KPIS and subfolder of the measure name
+    CurrentMeasure.DisplayFolder = df;
 
-//Create Measure of % Change for Tables / Matricies
+
+//Create Measure of % Change between most recent month and prior month
     var PercentChangeMeasure = c.Table.AddMeasure(
+//Selected measure name and "% Change" is the new measure name
          c.Name + " % Change",
 //Cal is the current % Change
-         "VAR Cal = DIVIDE( " + CurrentMeasure.DaxObjectFullName + " - " + PenultimateMeasure.DaxObjectFullName + " , " + PenultimateMeasure.DaxObjectFullName + " , 0 ) "
+         "VAR Cal = DIVIDE(" + CurrentMeasure.DaxObjectFullName + " - " + PenultimateMeasure.DaxObjectFullName + " , " + PenultimateMeasure.DaxObjectFullName + ")"
          + "RETURN "
          + "Cal"
         
     );
-    // Adds a measure description and move to a folder
-    PercentChangeMeasure.Description = "This measure is the % Change " + c.DaxObjectFullName;
-    PercentChangeMeasure.DisplayFolder = "__KPIs\\" + c.Name;
-//One Decimal Place
-    PercentChangeMeasure.FormatString = "#,#.#%";
+// Set the format string on the new measure, percentage with one decimal place
+    PercentChangeMeasure.FormatString = "0.0%;-0.0%;0.0%";;
+//Set the display folder for the measure to be KPIS and subfolder of the measure name
+    PercentChangeMeasure.DisplayFolder = df;
 
-//Concatenate Icon & Value for KPIs / Cards
+
+//Create a measure that concatenates an Icon & Value for KPIs / Cards
     var PercentChangeIcon = c.Table.AddMeasure(
-         c.Name + " KPI ",                    // Currently Selected Measure Name Appended with " KPI Indicator"
+// Currently Selected Measure Name Appended with " KPI"
+         c.Name + " KPI ",                    
          "VAR Down = UNICHAR( 10060 ) "
          + "VAR Up = UNICHAR( 9989 ) "
-         + "VAR Side = UNICHAR( 11208 ) "
-         //Target is the penultimate value for the selected measure
-         + "VAR Target = " + PenultimateMeasure.DaxObjectFullName
-         //Cal is the current value for the selected measure
-         + "VAR Cal = " + CurrentMeasure.DaxObjectFullName
-         //Label for the Arrow is the % Change
-         + "VAR Change = DIVIDE( Cal - Target , Target , 0 )"
+         + "VAR Side = UNICHAR( 11208 ) "   
+//Target is 0 for up or down, can adjust as needed depending on requirement
+         + "VAR Target = 0 "     
+//Label for the Arrow is the % Change
+         + "VAR Cal = " + PercentChangeMeasure.DaxObjectFullName
          + "RETURN "
-         //Switch Logic for each Arrow Scenario, Assumes up is good
+//Switch Logic for each Arrow Scenario, Assumes up is good
          + "SWITCH( TRUE() ,"
          + "Cal "
          + "< Target, Down ,"
@@ -63,26 +79,25 @@ foreach (var c in Selected.Measures)
          + "= Target, Side ,"
          + "Cal "
          + " > Target, Up )"
-         //Add in The Current Value Formatted Nicely
-         //Need to add in a percentage Option Too for the value
-         + " & FORMAT( Change , \"0.0%\" )"
+//Format the KPI, properly escape quotes used in the measure
+         + " & FORMAT( " + PercentChangeMeasure.DaxObjectFullName + " , \"0.0%;-0.0%;0.0%\" )"
     );
-    // Adds a measure description and move to a folder
-    PercentChangeIcon.Description = "This measure is Arrow indicator for " + c.DaxObjectFullName;
-    PercentChangeIcon.DisplayFolder = "__KPIs\\" + c.Name;
+//Set the display folder for the measure to be KPIS and subfolder of the measure name
+    PercentChangeIcon.DisplayFolder = df;
 
-//Create Conditional Color Formatting for the arrow indicator
+//Create Conditional Color Formatting for the KPI Comparing the two Months
     var PercentChangeArrowColors = c.Table.AddMeasure(
+//Names is color and measure name and Conditional Formatting
          "Color " + c.Name + " Conditional Formatting",
          "VAR Down = \"#0a0a0aff\" "
          + "VAR Up =  \"#12239E\" "
          + "VAR Side = \"#f39c12\" "
-         //Target is 0 for up or down, can adjust as needed depending on requirement
+//Target is 0 for up or down, can adjust as needed depending on requirement
          + "VAR Target = 0 "
-         //Cal is the current % Change
-         + "VAR Cal = DIVIDE( " + CurrentMeasure.DaxObjectFullName + " - " + PenultimateMeasure.DaxObjectFullName + " , " + PenultimateMeasure.DaxObjectFullName + " , 0 ) "
+//Cal is the current % Change
+         + "VAR Cal = " + PercentChangeMeasure.DaxObjectFullName
          + "RETURN "
-         //Switch Logic for each Arrow Scenario, Assumes up is good
+//Switch Logic for each Arrow Scenario, Assumes up is good
          + "SWITCH( TRUE() ,"
          + "Cal "
          + "< Target, Down ,"
@@ -92,26 +107,25 @@ foreach (var c in Selected.Measures)
          + " > Target, Up )"
         
     );
-    // Adds a measure description and move to a folder
-    PercentChangeArrowColors.Description = "This measure is Color Conditional Formatting for " + c.DaxObjectFullName;
-    PercentChangeArrowColors.DisplayFolder = "__KPIs\\" + c.Name + "\\Conditional Formatting";
+//Set the display folder for the measure to be KPIS, subfolder of the measure name, and conditional formatting to easily find it in the cf search box
+    PercentChangeArrowColors.DisplayFolder = df + "\\Conditional Formatting";
     
 
-//Create Conditional Icon Formatting for Tables / Matricies
+//Create Conditional Icon Formatting for Tables / Matricies, uses default Power BI Icon Set
     var PercentChangeIcons = c.Table.AddMeasure(
-         "Icon " + c.Name + "Conditional Formatting",
+         "Icon " + c.Name + " Conditional Formatting",
 //Red X
          "VAR Down = \"SymbolLow\" "
 //Green Checkmark
          + "VAR Up =  \"SymbolHigh\" "
 //Yellow Exlamation Point
          + "VAR Side = \"SymbolMedium\" "
-         //Target is 0 for up or down, can adjust as needed depending on requirement
+//Target is 0 for up or down, can adjust as needed depending on requirement
          + "VAR Target = 0 "
-         //Cal is the current % Change
-         + "VAR Cal = DIVIDE( " + CurrentMeasure.DaxObjectFullName + " - " + PenultimateMeasure.DaxObjectFullName + " , " + PenultimateMeasure.DaxObjectFullName + " , 0 ) "
+//Cal is the current % Change
+         + "VAR Cal = " + PercentChangeMeasure.DaxObjectFullName
          + "RETURN "
-         //Switch Logic for each Arrow Scenario, Assumes up is good
+//Switch Logic for each Arrow Scenario, Assumes up is good
          + "SWITCH( TRUE() ,"
          + "Cal "
          + "< Target, Down ,"
@@ -121,8 +135,91 @@ foreach (var c in Selected.Measures)
          + " > Target, Up )"
         
     );
-    // Adds a measure description and move to a folder
-    PercentChangeIcons.Description = "This measure is Icon Conditional Formatting for " + c.DaxObjectFullName;
-    PercentChangeIcons.DisplayFolder = "__KPIs\\" + c.Name + "\\Conditional Formatting";
+//Set the display folder for the measure to be KPIS, subfolder of the measure name, and conditional formatting to easily find it in the cf search box
+    PercentChangeIcons.DisplayFolder = df + "\\Conditional Formatting";
+
+//Adding additional KPIs/Formatting for comparing Targets in addition to Month Over Month
+
+//Variable for Folder Name for Targets
+var TDF = "__KPIs\\" + c.Name + "\\Target";
+
+//Create Measure For the Target to compare to
+    var TargetMeasure = c.Table.AddMeasure(
+//Selected measure name and " Target" is the new measure name
+         c.Name + " Target",
+//Target is the target amt, hardcoded to 0 initially
+         "VAR Target = " + "0"
+         + "RETURN "
+         + "Target"
+        
+    );
+//Set the Measure Folder Location
+ TargetMeasure.DisplayFolder = TDF;
+
+//Create Measure of % Change between most recent month and a target
+    var currentvstarget = c.Table.AddMeasure(
+//Selected measure name current vs target is the new measure name
+         c.Name + " Current vs Target",
+//Cal is the current % Change
+         "VAR Cal = " + PercentChangeMeasure.DaxObjectFullName
+         + "RETURN "
+         + "Cal"
+        
+    );
+//Set the display folder for the measure to be KPIS, subfolder of the measure name, and conditional formatting to easily find it in the cf search box
+    currentvstarget.DisplayFolder = TDF;
+
+//Create Conditional Color Formatting for the KPI Comparing the two Months
+    var PercentChangeTargetArrowColors = c.Table.AddMeasure(
+//Names is color and measure name and Conditional Formatting
+         "Target Color " + c.Name + " Conditional Formatting",
+         "VAR Down = \"#0a0a0aff\" "
+         + "VAR Up =  \"#12239E\" "
+         + "VAR Side = \"#f39c12\" "
+//Set to the target measure
+         + "VAR Target = 0 " 
+//Cal is the current % Change, reference newly created target comp measure
+         + "VAR Cal = " + PercentChangeMeasure.DaxObjectFullName
+         + "RETURN "
+//Switch Logic for each Arrow Scenario, Assumes up is good
+         + "SWITCH( TRUE() ,"
+         + "Cal "
+         + "< Target, Down ,"
+         + "Cal "
+         + "= Target, Side ,"
+         + "Cal "
+         + " > Target, Up )"
+        
+    );
+//Set the display folder for the measure to be KPIS, subfolder of the measure name, and conditional formatting to easily find it in the cf search box
+    PercentChangeTargetArrowColors.DisplayFolder = TDF + "\\Conditional Formatting";
+    
+    
+//Create Conditional Icon Formatting for Tables / Matricies, uses default Power BI Icon Set
+    var PercentChangeTargetIcons = c.Table.AddMeasure(
+         "Target Icon " + c.Name + " Conditional Formatting",
+//Red X
+         "VAR Down = \"SymbolLow\" "
+//Green Checkmark
+         + "VAR Up =  \"SymbolHigh\" "
+//Yellow Exlamation Point
+         + "VAR Side = \"SymbolMedium\" "
+//Target is 0 for up or down, can adjust as needed depending on requirement
+         + "VAR Target = 0 "
+//Cal is the current % Change
+         + "VAR Cal = " + currentvstarget.DaxObjectFullName
+         + "RETURN "
+//Switch Logic for each Arrow Scenario, Assumes up is good
+         + "SWITCH( TRUE() ,"
+         + "Cal "
+         + "< Target, Down ,"
+         + "Cal "
+         + "= Target, Side ,"
+         + "Cal "
+         + " > Target, Up )"
+        
+    );
+//Set the display folder for the measure to be KPIS, subfolder of the measure name, and conditional formatting to easily find it in the cf search box
+    PercentChangeTargetIcons.DisplayFolder = TDF + "\\Conditional Formatting";
 
 }
