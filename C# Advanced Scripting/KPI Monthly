@@ -1,0 +1,323 @@
+// ==========================================
+// CONFIG
+// ==========================================
+var calcTable = Model.Tables["_Calculations"];
+
+var CalcTableName = "_Calculations";
+
+var DateTableName = "Date";
+var DateColumnName = "Date";
+var YearColumnName = "Year";
+var MonthRelativeNumColumnName = "Month Relative Num";
+var MonthNumColumnName = "Month Num";
+
+var PercentFormat = "#,0.0%;-#,0.0%;#,0.0%";
+var DollarFormat  = "$#,##0;-$#,##0";
+var NumberFormat  = "#,##0;-#,##0";
+
+var DateTableRef = "'" + DateTableName + "'";
+var DateColumnRef = DateTableRef + "[" + DateColumnName + "]";
+var YearColumnRef = DateTableRef + "[" + YearColumnName + "]";
+var MonthRelativeNumColumnRef = DateTableRef + "[" + MonthRelativeNumColumnName + "]";
+var MonthNumColumnRef = DateTableRef + "[" + MonthNumColumnName + "]";
+
+// ==========================================
+// HELPERS
+// ==========================================
+
+Func<Measure, bool> IsPercent = m =>
+    (!string.IsNullOrWhiteSpace(m.FormatString) && m.FormatString.Contains("%"))
+    || (!string.IsNullOrWhiteSpace(m.FormatStringExpression) && m.FormatStringExpression.Contains("%"));
+
+Func<Measure, bool> IsDollar = m =>
+    (!string.IsNullOrWhiteSpace(m.FormatString) && m.FormatString.Contains("$"))
+    || (!string.IsNullOrWhiteSpace(m.FormatStringExpression) && m.FormatStringExpression.Contains("$"));
+
+Func<Measure, string> GetBaseFormatString = m =>
+{
+    if (IsPercent(m)) return PercentFormat;
+    if (IsDollar(m)) return DollarFormat;
+    return NumberFormat;
+};
+
+Func<string, string, string, string, Measure> AddCalcMeasure = (name, dax, folder, formatString) =>
+{
+    var m = calcTable.AddMeasure(name, dax);
+    m.DisplayFolder = folder;
+
+    if (!string.IsNullOrWhiteSpace(formatString))
+        m.FormatString = formatString;
+
+    return m;
+};
+
+Func<string, int, string> BuildMonthOffsetDax = (measureRef, monthOffset) =>
+{
+    return
+        "VAR M = MAX ( " + MonthRelativeNumColumnRef + " ) "
+      + "VAR Cal = "
+      + "CALCULATE ( "
+      + measureRef + ", "
+      + "FILTER ( "
+      + "ALLSELECTED ( " + DateTableRef + " ), "
+      + MonthRelativeNumColumnRef + " = M + (" + monthOffset.ToString() + ") "
+      + ") "
+      + ") "
+      + "RETURN Cal";
+};
+
+Func<string, string, bool, string> BuildChangeDax = (currentRef, comparisonRef, isPercentMeasure) =>
+{
+    if (isPercentMeasure)
+    {
+        return
+            "VAR Cal = DIVIDE(" + currentRef + ", " + comparisonRef + ") "
+          + "RETURN Cal";
+    }
+
+    return
+        "VAR Cal = DIVIDE((" + currentRef + " - " + comparisonRef + "), " + comparisonRef + ") "
+      + "RETURN Cal";
+};
+
+//Target special with comping to 100% and how far away from it for KPI
+Func<string, string, string> BuildTargetDax = (currentRef, comparisonRef) =>
+{
+
+    {
+        return
+            "DIVIDE(" + currentRef + ", " + comparisonRef + ") ";
+    }
+
+};
+//////////////////////////////////
+
+Func<string, string> BuildKpiLabelDax = measureRef =>
+{
+    return
+        "VAR Down = UNICHAR(9660) "
+      + "VAR Up = UNICHAR(9650) "
+      + "VAR Side = UNICHAR(11208) "
+      + "VAR Target = 0 "
+      + "VAR Cal = " + measureRef + " "
+      + "RETURN "
+      + "SWITCH( TRUE(), "
+      + "Cal < Target, Down, "
+      + "Cal = Target, Side, "
+      + "Cal > Target, Up ) "
+      + "& \" \" & "
+      + "FORMAT(" + measureRef + ", \"" + PercentFormat + "\")";
+};
+
+Func<string, string> BuildColorDax = measureRef =>
+{
+    return
+        "VAR Down = \"bad\" "
+      + "VAR Up = \"good\" "
+      + "VAR Side = \"#f39c12\" "
+      + "VAR Target = 0 "
+      + "VAR Cal = " + measureRef + " "
+      + "RETURN "
+      + "SWITCH( TRUE(), "
+      + "Cal < Target, Down, "
+      + "Cal = Target, Side, "
+      + "Cal > Target, Up )";
+};
+
+Func<string, string> BuildIconDax = measureRef =>
+{
+    return
+        "VAR Down = \"TriangleLow\" "
+      + "VAR Up = \"TriangleHigh\" "
+      + "VAR Side = \"TriangleMedium\" "
+      + "VAR Target = 0 "
+      + "VAR Cal = " + measureRef + " "
+      + "RETURN "
+      + "SWITCH( TRUE(), "
+      + "Cal < Target, Down, "
+      + "Cal = Target, Side, "
+      + "Cal > Target, Up )";
+};
+
+Func<string, string> BuildYtdDax = measureRef =>
+{
+    return
+        "VAR MAXDATE = MAX(" + DateColumnRef + ") "
+      + "VAR MAXYEAR = MAX(" + YearColumnRef + ") "
+      + "RETURN "
+      + "CALCULATE( "
+      + measureRef + ", "
+      + "FILTER( "
+      + "ALL(" + DateTableRef + "), "
+      + DateColumnRef + " < MAXDATE && "
+      + YearColumnRef + " = MAXYEAR "
+      + ") "
+      + ")";
+};
+
+Func<string, string> BuildLytdDax = measureRef =>
+{
+    return
+        "VAR MAXDATE = MAX(" + MonthNumColumnRef + ") "
+      + "VAR MAXYEAR = MAX(" + YearColumnRef + ") "
+      + "RETURN "
+      + "CALCULATE( "
+      + measureRef + ", "
+      + "FILTER( "
+      + "ALL(" + DateTableRef + "), "
+      + MonthNumColumnRef + " <= MAXDATE && "
+      + YearColumnRef + " = MAXYEAR - 1 "
+      + ") "
+      + ")";
+};
+
+
+
+
+
+// ==========================================
+// MAIN
+// ==========================================
+foreach (var c in Selected.Measures)
+{
+    var isPercent = IsPercent(c);
+    var baseFormat = GetBaseFormatString(c);
+
+    var kpiRoot = "__KPIs\\" + c.Name+ "\\Month";
+    var momFolder = kpiRoot + "\\MoM";
+    var targetFolder = kpiRoot + "\\Target";
+    var yoyFolder = kpiRoot + "\\YoY";
+    
+    var cfColor = " % Color";
+    var cfIcon = " % Icon";
+
+    // ==========================================
+    // MoM
+    // ==========================================
+    var MoMMeasureNameLabel = " MoM";
+    
+    var penultimateMeasure = AddCalcMeasure(
+        c.Name + " Last Month",
+        BuildMonthOffsetDax(c.DaxObjectFullName, -1),
+        momFolder,
+        baseFormat
+    );
+
+    var currentMeasure = AddCalcMeasure(
+        c.Name + " Current Month",
+        BuildMonthOffsetDax(c.DaxObjectFullName, 0),
+        momFolder,
+        baseFormat
+    );
+
+    var percentChangeMeasure = AddCalcMeasure(
+        c.Name + MoMMeasureNameLabel + " %",
+        BuildChangeDax(currentMeasure.DaxObjectFullName, penultimateMeasure.DaxObjectFullName, isPercent),
+        momFolder,
+        PercentFormat
+    );
+
+    AddCalcMeasure(
+        c.Name + MoMMeasureNameLabel +  " % KPI",
+        BuildKpiLabelDax(percentChangeMeasure.DaxObjectFullName),
+        momFolder,
+        null
+    );
+
+    AddCalcMeasure(
+        c.Name + MoMMeasureNameLabel + cfColor,
+        BuildColorDax(percentChangeMeasure.DaxObjectFullName),
+        momFolder + "\\Conditional Formatting",
+        null
+    );
+
+    AddCalcMeasure(
+        c.Name + MoMMeasureNameLabel + cfIcon,
+        BuildIconDax(percentChangeMeasure.DaxObjectFullName),
+        momFolder + "\\Conditional Formatting",
+        null
+    );
+
+    // ==========================================
+    // Target
+    // ==========================================
+    var targetMeasureNameLabel = " Month v Target";
+
+    var targetMeasure = AddCalcMeasure(
+        c.Name + " Month Target",
+        "1",
+        targetFolder,
+        baseFormat
+    );
+
+    var currentVsTarget = AddCalcMeasure(
+        c.Name + targetMeasureNameLabel +  " %",
+        BuildTargetDax(currentMeasure.DaxObjectFullName, targetMeasure.DaxObjectFullName),
+        targetFolder,
+        PercentFormat
+    );
+
+    AddCalcMeasure(
+        c.Name + targetMeasureNameLabel +  " % KPI",
+        BuildKpiLabelDax(currentVsTarget.DaxObjectFullName),
+        targetFolder,
+        null
+    );
+
+    AddCalcMeasure(
+        c.Name + targetMeasureNameLabel +  cfColor,
+        BuildColorDax(currentVsTarget.DaxObjectFullName),
+        targetFolder + "\\Conditional Formatting",
+        null
+    );
+
+    AddCalcMeasure(
+        c.Name + targetMeasureNameLabel +  cfIcon,
+        BuildIconDax(currentVsTarget.DaxObjectFullName),
+        targetFolder + "\\Conditional Formatting",
+        null
+    );
+
+    // ==========================================
+    // YoY
+    // ==========================================
+    
+    var YoYMeasureNameLabel = " Month YoY";
+    
+    var smlyMeasure = AddCalcMeasure(
+        c.Name + " SMLY",
+        BuildMonthOffsetDax(c.DaxObjectFullName, -12),
+        yoyFolder,
+        baseFormat
+    );
+
+    var percentChangeYoYMeasure = AddCalcMeasure(
+        c.Name + YoYMeasureNameLabel + " %",
+        BuildChangeDax(currentMeasure.DaxObjectFullName, smlyMeasure.DaxObjectFullName, isPercent),
+        yoyFolder,
+        PercentFormat
+    );
+
+    AddCalcMeasure(
+        c.Name + YoYMeasureNameLabel + " % KPI",
+        BuildKpiLabelDax(percentChangeYoYMeasure.DaxObjectFullName),
+        yoyFolder,
+        null
+    );
+
+    AddCalcMeasure(
+        c.Name + YoYMeasureNameLabel + cfColor,
+        BuildColorDax(percentChangeYoYMeasure.DaxObjectFullName),
+        yoyFolder + "\\Conditional Formatting",
+        null
+    );
+
+    AddCalcMeasure(
+        c.Name + YoYMeasureNameLabel + cfIcon,
+        BuildIconDax(percentChangeYoYMeasure.DaxObjectFullName),
+        yoyFolder + "\\Conditional Formatting",
+        null
+    );
+
+ 
+}
